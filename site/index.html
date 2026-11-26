@@ -1,0 +1,180 @@
+<title>Orbitwatch</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Every publicly catalogued satellite, positioned live from CelesTrak element sets with SGP4.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* @inline:styles */
+</style>
+
+<div class="app" id="app">
+  <header class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="16" cy="16" r="6.5" fill="currentColor" stroke="none" opacity="0.9"/>
+        <ellipse cx="16" cy="16" rx="14" ry="6" transform="rotate(-28 16 16)"/>
+        <circle cx="27.4" cy="9.6" r="2.4" fill="currentColor" stroke="none"/>
+      </svg>
+      <div>
+        <span class="name">Orbitwatch</span>
+        <span class="sub" id="brand-sub">Public satellite catalog · SGP4</span>
+      </div>
+    </div>
+    <div class="search" role="combobox" aria-haspopup="listbox" aria-owns="search-results" aria-expanded="false" id="search-box">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+      <input id="search" type="search" placeholder="Search name, NORAD or COSPAR ID" autocomplete="off" spellcheck="false" aria-label="Search satellites" aria-autocomplete="list" aria-controls="search-results">
+      <ul class="results" id="search-results" role="listbox" hidden></ul>
+    </div>
+    <div class="clock">
+      <span class="chip data" id="data-chip" title="Age of the orbital data">Data —</span>
+      <span class="chip live" id="mode-chip"><span class="dot"></span><span id="mode-text">Live</span></span>
+      <time id="clock" aria-live="off">--:--:-- UTC</time>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <canvas id="globe" aria-label="3D globe showing live satellite positions"></canvas>
+    <canvas id="map" aria-label="World map showing live satellite positions" hidden></canvas>
+    <div class="stage-ui">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" id="view-globe" aria-pressed="true">Globe</button>
+        <button type="button" id="view-map" aria-pressed="false">Map</button>
+      </div>
+      <div class="stage-tools">
+        <button type="button" class="tool" id="btn-follow" aria-pressed="false" title="Keep the selected satellite in view" hidden>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg><span class="lbl">Follow</span>
+        </button>
+        <button type="button" class="tool" id="btn-home" title="Reset view" aria-label="Reset view">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12"/></svg>
+        </button>
+      </div>
+      <div class="counter" id="counter" aria-live="polite">Loading catalog…</div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="banner" id="banner" hidden></div>
+      <div class="loading" id="loading">
+        <div class="box">
+          <div class="step" id="load-step">Loading catalog</div>
+          <div class="bar"><i id="load-bar"></i></div>
+          <div class="detail" id="load-detail">Fetching the latest element sets</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="timebar" role="group" aria-label="Time controls">
+    <button type="button" id="btn-back" title="Back 1 hour">−1h</button>
+    <button type="button" id="btn-play" aria-label="Pause" title="Pause / play">
+      <svg id="icon-pause" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="2.5" y="2" width="3" height="10" rx="0.5"/><rect x="8.5" y="2" width="3" height="10" rx="0.5"/></svg>
+      <svg id="icon-play" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true" hidden><path d="M3.5 2v10l8.5-5z"/></svg>
+    </button>
+    <button type="button" id="btn-fwd" title="Forward 1 hour">+1h</button>
+    <select id="speed" aria-label="Playback speed">
+      <option value="1">1×</option>
+      <option value="10">10×</option>
+      <option value="60">60×</option>
+      <option value="300">300×</option>
+      <option value="900">900×</option>
+    </select>
+    <div class="scrub">
+      <input id="scrub" type="range" min="-2880" max="2880" step="5" value="0" aria-label="Time offset from now, in minutes">
+      <div class="ticks" aria-hidden="true"><span>−48 h</span><span>−24 h</span><span>now</span><span>+24 h</span><span>+48 h</span></div>
+    </div>
+    <span class="offset" id="offset">now</span>
+    <button type="button" class="live-btn" id="btn-live" aria-pressed="true">Live</button>
+  </div>
+
+  <aside class="rail" aria-label="Satellite details and controls">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-filters" aria-controls="panel-filters" aria-selected="true">Filters</button>
+      <button type="button" role="tab" id="tab-selected" aria-controls="panel-selected" aria-selected="false">Object</button>
+      <button type="button" role="tab" id="tab-overhead" aria-controls="panel-overhead" aria-selected="false">Overhead</button>
+      <button type="button" role="tab" id="tab-stats" aria-controls="panel-stats" aria-selected="false">Stats</button>
+    </div>
+
+    <section class="panel" id="panel-filters" role="tabpanel" aria-labelledby="tab-filters">
+      <div class="section">
+        <div class="row-head"><h2>Category</h2><span><button type="button" class="link-btn" id="cat-all">All</button> · <button type="button" class="link-btn" id="cat-none">None</button></span></div>
+        <ul class="cat-list" id="cat-list"></ul>
+      </div>
+      <div class="section">
+        <h2>Orbit</h2>
+        <div class="chips" id="regime-chips"></div>
+        <p class="note" id="regime-note">LEO below 2,000 km · MEO between · GEO geosynchronous · HEO highly elliptical</p>
+      </div>
+      <div class="section">
+        <div class="field">
+          <label for="owner">Country or operator</label>
+          <select id="owner"><option value="">All countries and operators</option></select>
+        </div>
+      </div>
+      <div class="section">
+        <label class="toggle"><input type="checkbox" id="only-favs"> Only my starred objects</label>
+        <label class="toggle"><input type="checkbox" id="only-new"> Launched in the last 30 days</label>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-selected" role="tabpanel" aria-labelledby="tab-selected" hidden>
+      <div class="empty-state" id="sel-empty">
+        <div class="title">Nothing selected</div>
+        <p>Click or tap any dot on the globe, or search above. Try one of these:</p>
+        <div class="quick" id="quick-picks"></div>
+      </div>
+      <div id="sel-body" hidden></div>
+    </section>
+
+    <section class="panel" id="panel-overhead" role="tabpanel" aria-labelledby="tab-overhead" hidden>
+      <div class="section">
+        <h2>Your location</h2>
+        <div class="field">
+          <label for="city">Nearest city</label>
+          <select id="city"><option value="">Choose a city…</option></select>
+        </div>
+        <div class="coords">
+          <div class="field"><label for="obs-lat">Latitude °</label><input id="obs-lat" type="number" step="0.0001" min="-90" max="90" inputmode="decimal" placeholder="51.5072"></div>
+          <div class="field"><label for="obs-lon">Longitude °</label><input id="obs-lon" type="number" step="0.0001" min="-180" max="180" inputmode="decimal" placeholder="-0.1276"></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="obs-pick" aria-pressed="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 15s5-4.6 5-8.5A5 5 0 0 0 3 6.5C3 10.4 8 15 8 15z"/><circle cx="8" cy="6.5" r="1.8"/></svg>
+            Pick on the globe or map
+          </button>
+          <button type="button" class="btn" id="obs-clear" hidden>Clear</button>
+        </div>
+        <p class="note" id="obs-note">Your browser location isn't available inside this page, so choose a city, type coordinates or pick a point.</p>
+      </div>
+      <div class="section" id="over-section" hidden>
+        <div class="row-head"><h2 id="over-title">Above your horizon</h2><span class="note mono" id="over-time"></span></div>
+        <p class="note">Objects at least 10° above the horizon, highest first. Click one to select it.</p>
+        <ul class="over-list" id="over-list"></ul>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+      <div class="section">
+        <h2>By orbit</h2>
+        <div class="tiles" id="regime-tiles"></div>
+      </div>
+      <div class="section">
+        <h2>By category</h2>
+        <ul class="bars" id="cat-bars"></ul>
+      </div>
+      <div class="section">
+        <h2>Top countries and operators</h2>
+        <ul class="bars" id="owner-bars"></ul>
+      </div>
+      <div class="section">
+        <h2>Active objects by launch year</h2>
+        <svg class="hist" id="year-hist" role="img" aria-label="Number of active objects by launch year"></svg>
+      </div>
+      <div class="section">
+        <h2>About this data</h2>
+        <div class="about" id="about"></div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script type="module">
+/* @inline:app */
+</script>

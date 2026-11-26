@@ -1,0 +1,14 @@
+# Raw downloads from CelesTrak (rebuilt by scripts/fetch_catalog.py)
+data-raw/
+
+# Node tooling for the verification script
+node_modules/
+
+# Local test output
+test-output/
+
+.DS_Store
+__pycache__/
+
+# Built artifact (node scripts/build_site.mjs)
+dist/

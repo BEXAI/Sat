@@ -1,0 +1,19 @@
+{
+  "name": "orbitwatch",
+  "private": true,
+  "description": "Live global satellite tracker published as a Claude artifact",
+  "type": "module",
+  "scripts": {
+    "fetch": "python3 -I scripts/fetch_catalog.py",
+    "build:data": "python3 -I scripts/build_data.py",
+    "verify": "node scripts/verify_catalog.mjs",
+    "build:site": "node scripts/build_site.mjs",
+    "build": "npm run build:data && npm run verify && npm run build:site"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "satellite.js": "7.1.0",
+    "three": "0.187.0",
+    "world-atlas": "2.0.2"
+  }
+}

@@ -1,9 +1,48 @@
 # Plan: Live Global Satellite Tracker (Claude Artifact)
 
-> Status: **planning only, no code yet.**
+> Status: **Phases 0–4 built and published. Phase 5 mostly done.** See the progress log below.
+> Live artifact: https://claude.ai/artifact/1a2uYoYTueUGGG9me11esF
 > Repo: `bexai/sat` · Branch: `claude/determined-fermi-04jpsw`
-> Working title: **Orbitwatch** (placeholder, see Open Questions)
+> Name: **Orbitwatch** (default)
 > Plan date: 2026-11-26
+
+---
+
+## 0. Progress log
+
+### 2026-11-26: first live version
+
+Defaults used for the open questions: name Orbitwatch, active satellites only, 3D globe with
+a 2D map fallback, data refreshed on request (daily automatic refresh still to set up), and a private link.
+
+**Phase 0 findings**
+
+| Question | Finding | Decision |
+|---|---|---|
+| Can Claude Code reach CelesTrak? | Blocked at first. `celestrak.org` was added to the environment's allowed hosts. | The data pipeline runs in Claude Code. |
+| Can the page fetch CelesTrak itself? | No. The artifact sandbox only allows `fetch()` of the artifact's own files. | Data ships as supporting files and is refreshed by republishing. |
+| Does satellite.js 7.1.0 read OMM? | Yes (`json2satrec`). Catalog numbers already reach 101,512, past the old TLE limit. | OMM end to end. |
+| Can the page import libraries from jsDelivr? | Yes, scripts only. Images and stylesheets from CDNs are blocked. | three 0.187.0 and satellite.js 7.1.0 load from jsDelivr. The Earth is drawn from Natural Earth outlines on a canvas, with no image texture. |
+| Can a Web Worker import from jsDelivr? | No. Worker imports fall under the sandbox's worker policy (reproduced locally with an equivalent CSP). | satellite.js is bundled into `propagate.worker.js`. A main-thread fallback exists. |
+| Browser geolocation? | Blocked in artifacts. | City list, typed coordinates, or pick a point on the globe or map. |
+| SGP4 accuracy | Against the independent `sgp4` Python package on raw data: median 1.6 m, max 3.9 m (427 objects). | Rounding in the compact catalog is harmless. |
+| Speed | A full SGP4 pass over 16,936 objects takes about 110 ms in Node. Positions are sampled 1–5×/s and interpolated on the GPU. | Smooth at 1× to 900×. |
+
+**Done**
+
+- [x] Phase 0: feasibility (above)
+- [x] Phase 1: `fetch_catalog.py`, `build_data.py`, `verify_catalog.mjs`, `reference_positions.py`
+- [x] Phase 2: live globe of all 16,936 active objects, data-age badge, light and dark themes, responsive layout
+- [x] Phase 3: search (name, NORAD, COSPAR), select by click or tap, details panel, orbit and ground track, `#sat-25544` links
+- [x] Phase 4: category, orbit, country and recent-launch filters, live counts, 2D map with day/night, time controls (±48 h, 1×–900×), stats
+- [x] Phase 5 (most): observer location, "above your horizon" list, next passes with a sky plot, starred objects
+- [x] Local smoke test (`scripts/smoke_test.mjs`): desktop and phone, light and dark, clean console, no horizontal scroll
+
+**Next**
+
+- [ ] Phase 6: accessibility pass (screen reader labels on the canvas views, contrast check of category colors), testing on real phones
+- [ ] Phase 7: daily automatic refresh as a scheduled task (needs your go-ahead)
+- [ ] Phase 8: debris layer, "Explain this satellite" (`sample` capability), CSV export (`downloads`), naked-eye visibility
 
 ---
 
@@ -136,28 +175,29 @@ Attribution footer: "Orbital data: CelesTrak · Imagery: NASA · Borders: Natura
 
 ---
 
-## 6. Proposed repo layout
+## 6. Repo layout (as built)
 
 ```
 Sat/
 ├── plan.md                    ← this file
-├── README.md                  ← how to rebuild data & republish
-├── .gitignore                 ← data-raw/, scratch files
+├── README.md                  ← how to refresh data & republish
+├── package.json               ← pinned tooling: esbuild, satellite.js, three, world-atlas
 ├── scripts/
-│   ├── fetch_catalog.py       ← downloads CelesTrak GP + SATCAT (rate-limit aware)
+│   ├── fetch_catalog.py       ← downloads CelesTrak GP + SATCAT (2-hour cache, retries)
 │   ├── build_data.py          ← join, classify, validate, compact → site/data/
-│   └── test_sgp4_vectors.py   ← known-answer checks
-├── site/                      ← exactly what gets published as the artifact
-│   ├── index.html             ← page (UI, styles, main module)
+│   ├── verify_catalog.mjs     ← propagates every object with the page's own code
+│   ├── reference_positions.py ← independent SGP4 cross-check (python sgp4)
+│   ├── build_site.mjs         ← inlines page, bundles worker → dist/
+│   └── smoke_test.mjs         ← headless Chromium test + screenshots
+├── site/                      ← source of the artifact
+│   ├── index.html, styles.css, app.js
+│   ├── orbit-core.js          ← shared orbit maths
 │   ├── propagate.worker.js    ← SGP4 worker
-│   ├── data/
-│   │   ├── manifest.json
-│   │   ├── catalog-active.json
-│   │   ├── catalog-debris.json   (optional)
-│   │   └── world-110m.json
-│   └── img/
-│       └── earth-2k.jpg
-└── data-raw/                  ← git-ignored download cache
+│   └── data/
+│       ├── catalog.json       ← columnar elements + metadata, build info inside
+│       └── world.json         ← Natural Earth 1:50m land + borders
+├── dist/                      ← built output that gets published (git-ignored)
+└── data-raw/                  ← download cache (git-ignored)
 ```
 
 ---
@@ -300,4 +340,4 @@ Every phase ends with a commit and push to `claude/determined-fermi-04jpsw` and 
 
 ## 15. Next step
 
-Answer the open questions (or say "use your defaults": Orbitwatch, active only, 3D with 2D fallback, daily refresh, private), then start **Phase 0**. Claude will first ask you to approve adding `celestrak.org` to this environment's network allowlist.
+Phases 0–4 are live. Next: set up the daily automatic refresh (Phase 7), then the accessibility and real-device pass (Phase 6). See the progress log at the top.
